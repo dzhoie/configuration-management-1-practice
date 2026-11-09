@@ -18,7 +18,14 @@ _COMMAND_FACTORIES: dict[str, CommandFactory] = {
 
 
 def get_command(name: str) -> Command | None:
-    """Получить команду по имени."""
+    """Получить команду по имени.
+
+    Args:
+        name: имя команды.
+
+    Returns:
+        Экземпляр команды или None, если не найдена.
+    """
     factory = _COMMAND_FACTORIES.get(name)
     if factory is None:
         return None
