@@ -20,6 +20,14 @@ class EmulatorGUI:
         self.root.title(f"Эмулятор - [{build_prompt().strip('$ ')}]")
         self.root.geometry("800x600")
 
+        self._create_widgets()
+        self._display_startup_info()
+        self._execute_startup_script()
+
+        self.entry.focus()
+
+    def _create_widgets(self):
+        """Создать элементы интерфейса."""
         self.output_area = scrolledtext.ScrolledText(
             self.root, wrap=tk.WORD, state=tk.DISABLED, font=("Consolas", 11)
         )
@@ -37,6 +45,8 @@ class EmulatorGUI:
         )
         self.btn.pack(side=tk.RIGHT)
 
+    def _display_startup_info(self):
+        """Вывести информацию о запуске."""
         self.write_line(f"Эмулятор запущен: {build_prompt().strip('$ ')}")
         vfs_text = self.cfg.vfs_path if self.cfg.vfs_path else 'не загружена'
         self.write_line(f"VFS: {vfs_text}")
@@ -44,23 +54,24 @@ class EmulatorGUI:
         self.write_line(f"Стартовый скрипт: {scr_text}")
         self.write_line("-" * 40)
 
-        if self.cfg.script_path:
-            try:
-                commands = load_script(self.cfg.script_path)
-                for cmd in commands:
-                    self.write_line(f"{build_prompt()}{cmd}")
-                    res = self.repl.process_line(cmd)
-                    if "Error" in res:
-                        self.write_line(res)
-                        self.write_line("[!] Скрипт остановлен из-за ошибки.")
-                        break
-                    if res:
-                        self.write_line(res)
-                self.write_line("-" * 40)
-            except Exception as e:
-                self.write_line(f"Ошибка скрипта: {e}")
-
-        self.entry.focus()
+    def _execute_startup_script(self):
+        """Выполнить стартовый скрипт."""
+        if not self.cfg.script_path:
+            return
+        try:
+            commands = load_script(self.cfg.script_path)
+            for cmd in commands:
+                self.write_line(f"{build_prompt()}{cmd}")
+                res = self.repl.process_line(cmd)
+                if "Error" in res:
+                    self.write_line(res)
+                    self.write_line("[!] Скрипт остановлен из-за ошибки.")
+                    break
+                if res:
+                    self.write_line(res)
+            self.write_line("-" * 40)
+        except Exception as e:
+            self.write_line(f"Ошибка скрипта: {e}")
 
     def write_line(self, text: str = "") -> None:
         """Добавить строку в область вывода."""
