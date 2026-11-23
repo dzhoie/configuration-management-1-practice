@@ -1,11 +1,13 @@
 """Графический интерфейс эмулятора (GUI)."""
 
+import os
 import tkinter as tk
 from tkinter import scrolledtext
 from .config import Config
 from .repl import Repl
 from .prompt import build_prompt
 from .startup import load_script
+from .vfs import VFS
 
 
 class EmulatorGUI:
@@ -14,7 +16,10 @@ class EmulatorGUI:
     def __init__(self, cfg: Config) -> None:
         """Создать и настроить главное окно."""
         self.cfg = cfg
-        self.repl = Repl()
+        self.repl = None
+        self.vfs_status = ""
+        
+        self._load_vfs()
         
         self.root = tk.Tk()
         self.root.title(f"Эмулятор - [{build_prompt().strip('$ ')}]")
@@ -25,6 +30,24 @@ class EmulatorGUI:
         self._execute_startup_script()
 
         self.entry.focus()
+
+    def _load_vfs(self):
+        """Загрузить виртуальную файловую систему."""
+        vfs_path = str(self.cfg.vfs_path) if self.cfg.vfs_path else "vfs_test/vfs.csv"
+        if not os.path.exists(vfs_path):
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            alt_path = os.path.join(base_dir, vfs_path)
+            if os.path.exists(alt_path):
+                vfs_path = alt_path
+
+        try:
+            vfs = VFS(vfs_path)
+            self.vfs_status = vfs_path
+        except Exception as e:
+            vfs = None
+            self.vfs_status = f"Ошибка загрузки ({e})"
+            
+        self.repl = Repl(vfs)
 
     def _create_widgets(self):
         """Создать элементы интерфейса."""
@@ -40,16 +63,13 @@ class EmulatorGUI:
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         self.entry.bind("<Return>", self.on_enter)
 
-        self.btn = tk.Button(
-            bottom_frame, text="Выполнить", command=self.on_submit
-        )
+        self.btn = tk.Button(bottom_frame, text="Выполнить", command=self.on_submit)
         self.btn.pack(side=tk.RIGHT)
 
     def _display_startup_info(self):
-        """Вывести информацию о запуске."""
+        """Вывести отладочную информацию при запуске."""
         self.write_line(f"Эмулятор запущен: {build_prompt().strip('$ ')}")
-        vfs_text = self.cfg.vfs_path if self.cfg.vfs_path else 'не загружена'
-        self.write_line(f"VFS: {vfs_text}")
+        self.write_line(f"VFS: {self.vfs_status}")
         scr_text = self.cfg.script_path if self.cfg.script_path else 'не задан'
         self.write_line(f"Стартовый скрипт: {scr_text}")
         self.write_line("-" * 40)
@@ -59,16 +79,21 @@ class EmulatorGUI:
         if not self.cfg.script_path:
             return
         try:
-            commands = load_script(self.cfg.script_path)
+            script_path = str(self.cfg.script_path)
+            if not os.path.exists(script_path):
+                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                 script_path = os.path.join(base_dir, script_path)
+                 
+            commands = load_script(script_path)
             for cmd in commands:
                 self.write_line(f"{build_prompt()}{cmd}")
                 res = self.repl.process_line(cmd)
-                if "Error" in res:
-                    self.write_line(res)
-                    self.write_line("[!] Скрипт остановлен из-за ошибки.")
+                if "Error" in res or res == "Bye!" or "cannot" in res:
+                    if res: self.write_line(res)
+                    if res != "Bye!":
+                        self.write_line("[!] Скрипт остановлен из-за ошибки.")
                     break
-                if res:
-                    self.write_line(res)
+                if res: self.write_line(res)
             self.write_line("-" * 40)
         except Exception as e:
             self.write_line(f"Ошибка скрипта: {e}")
@@ -81,13 +106,13 @@ class EmulatorGUI:
         self.output_area.config(state=tk.DISABLED)
 
     def on_enter(self, event: tk.Event) -> None:
-        """Обработчик нажатия Enter в поле ввода."""
+        """Обработчик Enter."""
         self.on_submit()
 
     def on_submit(self) -> None:
-        """Обработчик нажатия кнопки или Enter."""
+        """Обработчик нажатия кнопки."""
         line = self.entry.get().strip()
-        if not line: 
+        if not line:
             return
         self.write_line(f"{build_prompt()}{line}")
         self.entry.delete(0, tk.END)
@@ -99,5 +124,5 @@ class EmulatorGUI:
             self.write_line(res)
 
     def run(self) -> None:
-        """Запустить главный цикл приложения."""
+        """Запустить цикл."""
         self.root.mainloop()
