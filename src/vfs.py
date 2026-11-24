@@ -32,30 +32,32 @@ class VFS:
         with open(csv_path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                path = row["path"].strip()
-                is_dir = row["type"].strip() == "dir"
-                content = row.get("content", "")
+                self._process_csv_row(row)
 
-                if path == "/":
-                    continue
+    def _process_csv_row(self, row):
+        """Обработать одну строку из CSV."""
+        path = row["path"].strip()
+        if path == "/":
+            return
+            
+        is_dir = row["type"].strip() == "dir"
+        content = row.get("content", "")
 
-                parts = [p for p in path.split("/") if p]
-                current = self.root
-                for i, part in enumerate(parts):
-                    is_last = (i == len(parts) - 1)
-                    if part not in current.children:
-                        current.children[part] = VFSNode(
-                            part, is_dir if is_last else True
-                        )
+        parts = [p for p in path.split("/") if p]
+        current = self.root
+        
+        for i, part in enumerate(parts):
+            is_last = (i == len(parts) - 1)
+            if part not in current.children:
+                current.children[part] = VFSNode(
+                    part, is_dir if is_last else True
+                )
 
-                    if not is_last:
-                        current = current.children[part]
-                    else:
-                        if is_dir:
-                            current.children[part].is_dir = True
-                        else:
-                            current.children[part].is_dir = False
-                            current.children[part].content = content
+            if not is_last:
+                current = current.children[part]
+            else:
+                current.children[part].is_dir = is_dir
+                current.children[part].content = content
 
     def get_node(self, path):
         """Найти узел по пути."""
